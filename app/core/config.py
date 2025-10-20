@@ -11,8 +11,38 @@ class ConfigManager:
     def __init__(self) -> None:
         """初始化"""
 
-        # 加载环境变量
+        # 配置文件路径
         self.config_path: Path = Path(__file__).parents[2] / "data" / "setting.toml"
+
+        # 确保配置文件存在（某些平台会使用空数据卷覆盖 /app/data，导致默认文件丢失）
+        self.config_path.parent.mkdir(parents=True, exist_ok=True)
+        if not self.config_path.exists():
+            default_config: Dict[str, Any] = {
+                "grok": {
+                    "api_key": "",
+                    "proxy_url": "",
+                    "temporary": True,
+                    "cf_clearance": "",
+                    "x_statsig_id": "ZTpUeXBlRXJyb3I6IENhbm5vdCByZWFkIHByb3BlcnRpZXMgb2YgdW5kZWZpbmVkIChyZWFkaW5nICdjaGlsZE5vZGVzJyk=",
+                    "filtered_tags": "xaiartifact,xai:tool_usage_card,grok:render",
+                    "stream_chunk_timeout": 120,
+                    "stream_total_timeout": 600,
+                    "stream_first_response_timeout": 30,
+                },
+                "global": {
+                    "base_url": "",
+                    "log_level": "DEBUG",
+                    "image_mode": "url",
+                    "admin_password": "admin",
+                    "admin_username": "admin",
+                    "image_cache_max_size_mb": 512,
+                    "video_cache_max_size_mb": 1024,
+                },
+            }
+            with open(self.config_path, "w", encoding="utf-8") as f:
+                f.write(toml.dumps(default_config))
+
+        # 加载配置
         self.global_config: Dict[str, Any] = self.load("global")
         self.grok_config: Dict[str, Any] = self.load("grok")
         self._storage = None
