@@ -1,7 +1,7 @@
 """Cloudflare cf_clearance 自动获取模块"""
 
 import asyncio
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 from curl_cffi.requests import AsyncSession
@@ -9,7 +9,37 @@ from curl_cffi.requests import AsyncSession
 from app.core.logger import logger
 from app.core.config import setting
 
-IMPERSONATE_BROWSER = "chrome133a"
+# 支持的浏览器配置列表
+BROWSER_PROFILES = ["chrome133a", "chrome131", "chrome130", "safari_ios_17.4.1"]
+
+# 多种获取方法的端点配置
+ACQUISITION_METHODS = [
+    {
+        "name": "主页访问法",
+        "urls": ["https://grok.com/"],
+        "browser": "chrome133a",
+    },
+    {
+        "name": "静态资源法",
+        "urls": ["https://assets.grok.com/favicon.ico"],
+        "browser": "chrome133a",
+    },
+    {
+        "name": "API端点法",
+        "urls": ["https://grok.com/rest/health"],
+        "browser": "chrome133a",
+    },
+    {
+        "name": "组合访问法",
+        "urls": ["https://grok.com/", "https://assets.grok.com/favicon.ico"],
+        "browser": "chrome133a",
+    },
+    {
+        "name": "Safari模拟法",
+        "urls": ["https://grok.com/"],
+        "browser": "safari_ios_17.4.1",
+    },
+]
 
 
 class CloudflareClearance:
@@ -43,105 +73,135 @@ class CloudflareClearance:
     async def refresh() -> Optional[str]:
         """强制刷新 cf_clearance 并保存到配置
         
+        使用多种方法依次尝试获取 cf_clearance，提高成功率
+        
         Returns:
             新的 cf_clearance 值（不含前缀），若失败返回 None
         """
         async with CloudflareClearance._lock:
+            proxy_url = setting.get_service_proxy()
+            proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else {}
+            
+            if proxy_url:
+                logger.debug(f"[CF] 使用代理获取 cf_clearance: {CloudflareClearance._mask_proxy(proxy_url)}")
+            else:
+                logger.debug("[CF] 未配置代理，获取 cf_clearance 时禁用环境代理变量")
+            
+            # 尝试所有配置的获取方法
+            for i, method in enumerate(ACQUISITION_METHODS, 1):
+                logger.debug(f"[CF] 尝试方法 {i}/{len(ACQUISITION_METHODS)}: {method['name']}")
+                
+                try:
+                    cf_value = await CloudflareClearance._try_method(method, proxies)
+                    
+                    if cf_value:
+                        # 成功获取，保存到配置
+                        await setting.save(
+                            grok_config={
+                                "cf_clearance": f"cf_clearance={cf_value}",
+                                "cf_last_error": "",
+                                "cf_last_success_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                "cf_last_method": method['name']
+                            }
+                        )
+                        CloudflareClearance._last_error = None
+                        logger.info(f"[CF] 成功通过 '{method['name']}' 获取并保存 cf_clearance")
+                        return cf_value
+                    
+                except Exception as e:
+                    logger.warning(f"[CF] 方法 '{method['name']}' 执行异常: {type(e).__name__}: {e}")
+                    continue
+            
+            # 所有方法都失败
+            proxy_hint = CloudflareClearance._mask_proxy(proxy_url) if proxy_url else "未使用代理"
+            message = (
+                f"所有 {len(ACQUISITION_METHODS)} 种自动获取方法均失败。代理: {proxy_hint}。"
+                "建议在后台手动配置或更换代理/IP"
+            )
+            CloudflareClearance._last_error = message
+            
             try:
-                proxy_url = setting.get_service_proxy()
-                # 若未配置代理，明确禁用环境代理
-                proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else {}
-                if proxy_url:
-                    logger.debug(f"[CF] 使用代理获取 cf_clearance: {CloudflareClearance._mask_proxy(proxy_url)}")
-                else:
-                    logger.debug("[CF] 未配置代理，获取 cf_clearance 时禁用环境代理变量")
+                await setting.save(grok_config={
+                    "cf_last_error": message,
+                    "cf_last_error_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                })
+            except Exception as se:
+                logger.warning(f"[CF] 记录失败信息到配置时出错: {se}")
+            
+            logger.warning("[CF] " + message)
+            return None
 
-                headers = {
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-                    "Accept-Language": "zh-CN,zh;q=0.9",
-                    "Cache-Control": "no-cache",
-                    "Pragma": "no-cache",
-                    "Upgrade-Insecure-Requests": "1",
-                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
-                    "Sec-Fetch-Dest": "document",
-                    "Sec-Fetch-Mode": "navigate",
-                    "Sec-Fetch-Site": "none",
-                    "Sec-Fetch-User": "?1",
-                }
-
-                first_status = None
-                second_status = None
-
-                async with AsyncSession() as session:
-                    # 访问主页尝试通过 Cloudflare 验证
+    @staticmethod
+    async def _try_method(method: Dict[str, Any], proxies: Dict[str, str]) -> Optional[str]:
+        """尝试单个获取方法
+        
+        Args:
+            method: 方法配置字典
+            proxies: 代理配置
+            
+        Returns:
+            cf_clearance 值或 None
+        """
+        headers = CloudflareClearance._build_headers(method.get("browser", "chrome133a"))
+        browser_profile = method.get("browser", "chrome133a")
+        urls = method.get("urls", [])
+        
+        async with AsyncSession() as session:
+            for url in urls:
+                try:
                     resp = await session.get(
-                        "https://grok.com/",
+                        url,
                         headers=headers,
-                        impersonate=IMPERSONATE_BROWSER,
+                        impersonate=browser_profile,
                         proxies=proxies,
                         allow_redirects=True,
                         timeout=30,
                     )
-                    first_status = getattr(resp, "status_code", None)
-                    logger.debug(f"[CF] 访问 grok.com 返回状态: {resp.status_code}")
-
-                    # 若未拿到，尝试访问静态资源域名
+                    logger.debug(f"[CF] 访问 {url} 返回状态: {resp.status_code}")
+                    
+                    # 检查是否获取到 cf_clearance
                     cf_value = CloudflareClearance._extract_cf_clearance(session)
-                    if not cf_value:
-                        resp2 = await session.get(
-                            "https://assets.grok.com/favicon.ico",
-                            headers=headers,
-                            impersonate=IMPERSONATE_BROWSER,
-                            proxies=proxies,
-                            allow_redirects=True,
-                            timeout=30,
-                        )
-                        second_status = getattr(resp2, "status_code", None)
-                        logger.debug(f"[CF] 访问 assets.grok.com 返回状态: {resp2.status_code}")
-                        cf_value = CloudflareClearance._extract_cf_clearance(session)
-
-                if cf_value:
-                    # 保存到配置（ConfigManager.save 会自动去掉前缀存储、reload 后添加前缀）
-                    await setting.save(
-                        grok_config={
-                            "cf_clearance": f"cf_clearance={cf_value}",
-                            "cf_last_error": "",
-                            "cf_last_success_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        }
-                    )
-                    CloudflareClearance._last_error = None
-                    logger.info("[CF] 已自动获取并保存 cf_clearance")
-                    return cf_value
-                else:
-                    # 记录失败信息并持久化
-                    proxy_hint = CloudflareClearance._mask_proxy(proxy_url) if proxy_url else "未使用代理"
-                    message = (
-                        f"自动获取 cf_clearance 失败。访问 grok.com 状态: {first_status}; "
-                        f"assets.grok.com 状态: {second_status}; 代理: {proxy_hint}。"
-                        "建议在后台手动配置或更换代理/IP"
-                    )
-                    CloudflareClearance._last_error = message
-                    try:
-                        await setting.save(grok_config={
-                            "cf_last_error": message,
-                            "cf_last_error_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        })
-                    except Exception as se:
-                        logger.warning(f"[CF] 记录失败信息到配置时出错: {se}")
-                    logger.warning("[CF] " + message)
-                    return None
-            except Exception as e:
-                # 记录异常详情
-                CloudflareClearance._last_error = f"获取 cf_clearance 异常: {type(e).__name__}: {e}"
-                try:
-                    await setting.save(grok_config={
-                        "cf_last_error": CloudflareClearance._last_error,
-                        "cf_last_error_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    })
-                except Exception as se:
-                    logger.warning(f"[CF] 记录失败信息到配置时出错: {se}")
-                logger.error(f"[CF] 获取 cf_clearance 过程中发生异常: {e}")
-                return None
+                    if cf_value:
+                        return cf_value
+                        
+                except Exception as e:
+                    logger.debug(f"[CF] 访问 {url} 失败: {e}")
+                    continue
+            
+            # 最后再检查一次会话中的 cookie
+            return CloudflareClearance._extract_cf_clearance(session)
+    
+    @staticmethod
+    def _build_headers(browser: str) -> Dict[str, str]:
+        """根据浏览器类型构建请求头
+        
+        Args:
+            browser: 浏览器类型标识
+            
+        Returns:
+            请求头字典
+        """
+        # Safari iOS 特殊请求头
+        if "safari" in browser.lower():
+            return {
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "zh-CN,zh-Hans;q=0.9",
+                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Mobile/15E148 Safari/604.1",
+            }
+        
+        # Chrome 默认请求头
+        return {
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+            "Accept-Language": "zh-CN,zh;q=0.9",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+            "Upgrade-Insecure-Requests": "1",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+        }
 
     @staticmethod
     def _extract_cf_clearance(session: AsyncSession) -> Optional[str]:
