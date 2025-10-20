@@ -68,8 +68,26 @@ class FileStorage(BaseStorage):
         # 初始化配置文件
         if not self.config_file.exists():
             default_config = {
-                "global": {"api_keys": [], "admin_username": "admin", "admin_password": "admin"},
-                "grok": {"proxy_url": "", "cf_clearance": "", "x_statsig_id": ""}
+                "grok": {
+                    "api_key": "",
+                    "proxy_url": "",
+                    "temporary": True,
+                    "cf_clearance": "",
+                    "x_statsig_id": "ZTpUeXBlRXJyb3I6IENhbm5vdCByZWFkIHByb3BlcnRpZXMgb2YgdW5kZWZpbmVkIChyZWFkaW5nICdjaGlsZE5vZGVzJyk=",
+                    "filtered_tags": "xaiartifact,xai:tool_usage_card,grok:render",
+                    "stream_chunk_timeout": 120,
+                    "stream_total_timeout": 600,
+                    "stream_first_response_timeout": 30,
+                },
+                "global": {
+                    "base_url": "",
+                    "log_level": "DEBUG",
+                    "image_mode": "url",
+                    "admin_password": "admin",
+                    "admin_username": "admin",
+                    "image_cache_max_size_mb": 512,
+                    "video_cache_max_size_mb": 1024,
+                },
             }
             await self._write_file(self.config_file, toml.dumps(default_config))
             logger.info("[Storage] 创建新的配置文件")
