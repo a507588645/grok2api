@@ -400,6 +400,7 @@ server {
     ssl_certificate_key /path/to/key.pem;
     
     location / {
+        # 转发到本地应用（端口需与 docker-compose.yml 中的映射一致，默认为 8000）
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
