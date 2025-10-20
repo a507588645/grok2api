@@ -62,7 +62,7 @@ class FileStorage(BaseStorage):
 
         # 初始化token文件
         if not self.token_file.exists():
-            await self._write_file(self.token_file, json.dumps({"sso": {}, "ssoSuper": {}}, indent=2, ensure_ascii=False))
+            await self._write_file(self.token_file, json.dumps({"ssoNormal": {}, "ssoSuper": {}}, indent=2, ensure_ascii=False))
             logger.info("[Storage] 创建新的token文件")
 
         # 初始化配置文件
@@ -126,7 +126,7 @@ class FileStorage(BaseStorage):
 
     async def load_tokens(self) -> Dict[str, Any]:
         """加载token数据"""
-        return await self._load_json(self.token_file, {"sso": {}, "ssoSuper": {}}, self._token_lock)
+        return await self._load_json(self.token_file, {"ssoNormal": {}, "ssoSuper": {}}, self._token_lock)
 
     async def save_tokens(self, data: Dict[str, Any]) -> None:
         """保存token数据"""
@@ -188,7 +188,7 @@ class MysqlStorage(BaseStorage):
             'password': unquote(parsed.password) if parsed.password else "",
             'host': parsed.hostname,
             'port': parsed.port or 3306,
-            'db': parsed.path[1:] if parsed.path else "grok2apiChange"
+            'db': parsed.path[1:] if parsed.path else "grok2api"
         }
 
     async def _create_db(self, parsed: Dict[str, Any]) -> None:
@@ -464,12 +464,20 @@ class StorageManager:
         }
 
         if mode in ("mysql", "redis") and not url:
-            raise ValueError(f"{mode.upper()}模式需要DATABASE_URL环境变量")
+            logger.warning(f"[Storage] 未提供 DATABASE_URL，已回退到文件存储模式")
+            mode = "file"
 
         storage_class = storage_classes.get(mode, FileStorage)
-        self._storage = storage_class(url, data_dir) if mode != "file" else storage_class(data_dir)
+        try:
+            self._storage = storage_class(url, data_dir) if mode != "file" else storage_class(data_dir)
+            await self._storage.init_db()
+        except Exception as e:
+            logger.error(f"[Storage] 初始化{mode}存储失败: {e}，回退到文件存储模式")
+            mode = "file"
+            storage_class = FileStorage
+            self._storage = storage_class(data_dir)
+            await self._storage.init_db()
 
-        await self._storage.init_db()
         self._initialized = True
         logger.info(f"[Storage] 使用{mode}存储模式")
         logger.info("[Storage] 存储管理器初始化完成")

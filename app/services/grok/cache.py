@@ -59,15 +59,32 @@ class CacheService:
 
             async with AsyncSession() as session:
                 logger.debug(f"[{self.cache_type.upper()}Cache] 开始下载: https://assets.grok.com{file_path}")
-                response = await session.get(
-                    f"https://assets.grok.com{file_path}",
-                    headers=headers,
-                    proxies=proxies,
-                    timeout=timeout,
-                    allow_redirects=True,
-                    impersonate="chrome133a"
-                )
-                response.raise_for_status()
+
+                async def do_get(req_headers: dict):
+                    return await session.get(
+                        f"https://assets.grok.com{file_path}",
+                        headers=req_headers,
+                        proxies=proxies,
+                        timeout=timeout,
+                        allow_redirects=True,
+                        impersonate="chrome133a"
+                    )
+
+                response = await do_get(headers)
+
+                # 如遇403，尝试刷新cf_clearance后重试一次
+                if response.status_code == 403:
+                    logger.warning(f"[{self.cache_type.upper()}Cache] 收到403，尝试刷新 cf_clearance 后重试一次")
+                    await CloudflareClearance.refresh()
+                    cf_clearance_new = setting.grok_config.get("cf_clearance", "")
+                    new_headers = headers.copy()
+                    new_headers["Cookie"] = f"{auth_token};{cf_clearance_new}" if cf_clearance_new else auth_token
+                    response = await do_get(new_headers)
+
+                if response.status_code != 200:
+                    logger.error(f"[{self.cache_type.upper()}Cache] 下载失败，状态码: {response.status_code}")
+                    return None
+
                 cache_path.write_bytes(response.content)
                 logger.debug(f"[{self.cache_type.upper()}Cache] 文件已缓存: {cache_path} ({len(response.content)} bytes)")
                 asyncio.create_task(self.cleanup_cache())
