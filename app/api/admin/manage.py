@@ -407,9 +407,22 @@ async def delete_tokens(request: DeleteTokensRequest,
 
 @router.get("/api/settings")
 async def get_settings(_: bool = Depends(verify_admin_session)) -> Dict[str, Any]:
-    """获取全局配置"""
+    """获取全局配置
+    
+    优化：在返回配置前尝试自动获取 Cloudflare cf_clearance，
+    以便在管理页面无需手动填写即可展示。
+    """
     try:
         logger.debug("[Admin] 获取全局配置")
+
+        # 在返回设置前确保 cf_clearance 可用（若尚未配置则自动获取）
+        try:
+            from app.services.grok.cloudflare import CloudflareClearance
+            await CloudflareClearance.ensure()
+        except Exception as _:
+            # 忽略自动获取失败，保持原有返回逻辑
+            pass
+
         return {
             "success": True,
             "data": {
