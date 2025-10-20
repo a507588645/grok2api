@@ -139,6 +139,13 @@ venv.bak/
 
 logs/*
 
+# Data temp files
+data/temp/image/*
+!data/temp/image/.gitkeep
+data/temp/video/*
+!data/temp/video/.gitkeep
+data/temp/*.temp
+
 # Spyder project settings
 .spyderproject
 .spyproject

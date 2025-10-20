@@ -60,42 +60,30 @@ curl https://你的服务器地址/v1/chat/completions \
 
 ## 如何部署
 
-### 发布 Docker 镜像
+### 快速开始（推荐）
 
-默认仓库已内置 GitHub Actions 工作流（`.github/workflows/docker.yml`），当代码推送到 `main` 分支或打上 `v*` 标签时，会自动构建多架构 Docker 镜像并推送到 GitHub Container Registry（`ghcr.io/a507588645/grok2api`）。如需使用该流程：
-
-1. 在 GitHub 仓库的 **Settings → Actions → General** 中，确保允许 GitHub Actions 访问 `GITHUB_TOKEN` 的写入权限（默认开启）。
-2. 若要推送到 `ghcr.io`，无需额外配置即可使用仓库内置的 `GITHUB_TOKEN`。
-3. 若希望推送到 Docker Hub 或其他注册表，可在仓库 **Settings → Secrets and variables → Actions** 中新增凭证（例如 `DOCKERHUB_USERNAME`、`DOCKERHUB_TOKEN`），并按照注释修改工作流文件中的 `registry`、`username`、`password` 参数。
-
-也可以在本地手动构建并推送镜像：
+使用 Docker Compose 一键部署：
 
 ```bash
-# 登录容器注册表，以下示例为 ghcr
-echo "<个人访问令牌>" | docker login ghcr.io -u <GitHub 用户名> --password-stdin
+# 1. 创建 docker-compose.yml 文件
+# 2. 启动服务
+docker-compose up -d
 
-# 构建多架构镜像
-docker buildx build \
-  --platform linux/amd64,linux/arm64 \
-  --tag ghcr.io/a507588645/grok2api:latest \
-  --push .
+# 3. 查看日志
+docker-compose logs -f
 
-# 或仅构建并在本地测试
-docker build -t grok2api:local .
+# 4. 访问管理后台
+# 浏览器访问: http://your-server-ip:8000/login
+# 默认用户名: admin
+# 默认密码: admin
 ```
 
-推送成功后，可在云服务器上直接拉取镜像部署：
+**⚠️ 重要提示：**
+- 首次部署后，请立即登录管理后台修改默认密码
+- 必须在管理后台添加 Grok Token 才能使用服务
+- 建议正确配置 `base_url` 参数以确保图片和视频功能正常
 
-```bash
-docker pull ghcr.io/a507588645/grok2api:latest
-docker run -d -p 8000:8000 --name grok2api \
-  -v $(pwd)/data:/app/data \
-  ghcr.io/a507588645/grok2api:latest
-```
-
-如需公开镜像，可在 GitHub 仓库的 **Packages** 页面将该镜像的可见范围设置为 Public。
-
-### docker-compose
+### docker-compose 配置
 
 ```yaml
 services:
@@ -114,22 +102,123 @@ services:
 
       ## MySQL格式: mysql://user:password@host:port/database
       ## Redis格式: redis://host:port/db 或 redis://user:password@host:port/db
+    restart: unless-stopped
 
 volumes:
   grok_data:
 ```
 
+### Docker 命令行部署
+
+```bash
+# 拉取最新镜像
+docker pull ghcr.io/a507588645/grok2api:latest
+
+# 启动容器
+docker run -d -p 8000:8000 --name grok2api \
+  -v grok_data:/app/data \
+  -v $(pwd)/logs:/app/logs \
+  -e STORAGE_MODE=file \
+  --restart unless-stopped \
+  ghcr.io/a507588645/grok2api:latest
+
+# 查看日志
+docker logs -f grok2api
+```
+
+### 本地开发部署
+
+```bash
+# 1. 克隆仓库
+git clone https://github.com/a507588645/grok2api.git
+cd grok2api
+
+# 2. 安装依赖
+pip install -r requirements.txt
+
+# 3. 启动服务
+python main.py
+
+# 服务将在 http://localhost:8000 启动
+```
+
 ### 环境变量说明
 
-| 环境变量      | 必填 | 说明                                    | 示例 |
-|---------------|------|-----------------------------------------|------|
-| STORAGE_MODE  | 否   | 存储模式：file/mysql/redis               | file |
-| DATABASE_URL  | 否   | 数据库连接URL（MySQL/Redis模式时必需）   | mysql://user:pass@host:3306/db |
+| 环境变量      | 必填 | 默认值 | 说明                                    | 示例 |
+|---------------|------|--------|----------------------------------------|------|
+| STORAGE_MODE  | 否   | file   | 存储模式：file/mysql/redis              | file |
+| DATABASE_URL  | 条件 | -      | 数据库连接URL（MySQL/Redis模式时必需）  | mysql://user:pass@host:3306/db |
 
-**存储模式：**
-- `file`: 本地文件存储（默认）
-- `mysql`: MySQL数据库存储，需设置DATABASE_URL
-- `redis`: Redis缓存存储，需设置DATABASE_URL
+**存储模式详解：**
+- `file`: 本地文件存储（默认），适合单机部署，无需额外配置
+- `mysql`: MySQL数据库存储，适合分布式部署，需设置 DATABASE_URL
+- `redis`: Redis缓存存储，适合高并发场景，需设置 DATABASE_URL
+
+**数据库 URL 格式：**
+- MySQL: `mysql://username:password@hostname:3306/database_name`
+- Redis: `redis://hostname:6379/0` 或 `redis://username:password@hostname:6379/0`
+
+### 构建自定义镜像
+
+#### 自动构建（GitHub Actions）
+
+默认仓库已内置 GitHub Actions 工作流（`.github/workflows/docker.yml`），当代码推送到 `main` 分支或打上 `v*` 标签时，会自动构建多架构 Docker 镜像并推送到 GitHub Container Registry。
+
+**配置步骤：**
+1. 在 GitHub 仓库的 **Settings → Actions → General** 中，确保允许 GitHub Actions 访问 `GITHUB_TOKEN` 的写入权限
+2. 推送到 `ghcr.io` 无需额外配置，使用仓库内置的 `GITHUB_TOKEN`
+3. 推送到 Docker Hub 需在 **Settings → Secrets and variables → Actions** 中添加凭证
+
+#### 手动构建
+
+```bash
+# 登录容器注册表（以 ghcr.io 为例）
+echo "<个人访问令牌>" | docker login ghcr.io -u <GitHub用户名> --password-stdin
+
+# 构建多架构镜像并推送
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  --tag ghcr.io/a507588645/grok2api:latest \
+  --push .
+
+# 仅本地构建测试
+docker build -t grok2api:local .
+```
+
+### 部署故障排查
+
+#### 容器无法启动
+```bash
+# 查看容器日志
+docker logs grok2api
+
+# 检查容器状态
+docker ps -a | grep grok2api
+
+# 常见原因：
+# 1. 端口被占用：修改 docker-compose.yml 中的端口映射
+# 2. 数据目录权限：确保 Docker 有权限访问挂载的目录
+```
+
+#### 数据库连接失败
+```bash
+# 检查 DATABASE_URL 格式是否正确
+# MySQL: mysql://user:pass@host:3306/dbname
+# Redis: redis://host:6379/0
+
+# 测试数据库连接
+docker exec -it grok2api python -c "from app.core.storage import storage_manager; import asyncio; asyncio.run(storage_manager.init())"
+```
+
+#### 图片/视频无法显示
+- 确保在管理后台正确设置了 `base_url` 参数
+- `base_url` 应为服务的完整访问地址，例如：`http://your-domain.com` 或 `http://your-ip:8000`
+- 检查防火墙是否开放了 8000 端口
+
+#### 无法访问管理后台
+- 确认容器正在运行：`docker ps | grep grok2api`
+- 检查端口映射是否正确：`docker port grok2api`
+- 尝试访问：`http://localhost:8000/login`（本地）或 `http://your-server-ip:8000/login`（远程）
 
 <br>
 
@@ -137,11 +226,88 @@ volumes:
 
 > 与 OpenAI 官方接口完全兼容，API 请求需通过 **Authorization header** 认证
 
+### API 认证
+
+所有 API 请求（除了管理接口）都需要在请求头中包含认证信息：
+
+```bash
+Authorization: Bearer YOUR_API_KEY
+```
+
+API 密钥可以在管理后台的系统配置中设置，如果未设置则不需要认证（不推荐用于生产环境）。
+
+### 核心接口
+
 | 方法  | 端点                         | 描述                               | 是否需要认证 |
 |-------|------------------------------|------------------------------------|------|
 | POST  | `/v1/chat/completions`       | 创建聊天对话（流式/非流式）         | ✅   |
 | GET   | `/v1/models`                 | 获取全部支持模型                   | ✅   |
 | GET   | `/images/{img_path}`         | 获取生成图片文件                   | ❌   |
+| GET   | `/videos/{video_path}`       | 获取生成视频文件                   | ❌   |
+| GET   | `/health`                    | 健康检查接口                       | ❌   |
+
+### 使用示例
+
+#### 基本对话
+
+```bash
+curl https://your-server.com/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{
+    "model": "grok-3-fast",
+    "messages": [
+      {"role": "user", "content": "你好，介绍一下你自己"}
+    ]
+  }'
+```
+
+#### 流式对话
+
+```bash
+curl https://your-server.com/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{
+    "model": "grok-3-fast",
+    "messages": [
+      {"role": "user", "content": "写一首诗"}
+    ],
+    "stream": true
+  }'
+```
+
+#### 图像生成
+
+在对话中直接描述需要生成的图像：
+
+```bash
+curl https://your-server.com/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{
+    "model": "grok-3-fast",
+    "messages": [
+      {"role": "user", "content": "画一个可爱的小猫咪"}
+    ]
+  }'
+```
+
+#### 深度思考模式
+
+使用支持深度思考的模型（如 grok-4-fast）：
+
+```bash
+curl https://your-server.com/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{
+    "model": "grok-4-fast",
+    "messages": [
+      {"role": "user", "content": "请深入分析量子计算的发展前景"}
+    ]
+  }'
+```
 
 <br>
 
