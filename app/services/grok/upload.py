@@ -11,6 +11,7 @@ from app.services.grok.statsig import get_dynamic_headers
 from app.core.exception import GrokApiException
 from app.core.config import setting
 from app.core.logger import logger
+from app.services.grok.cloudflare import CloudflareClearance
 
 # 常量定义
 UPLOAD_ENDPOINT = "https://grok.com/rest/app-chat/upload-file"
@@ -58,6 +59,9 @@ class ImageUploadManager:
             # 获取认证令牌
             if not auth_token:
                 raise GrokApiException("认证令牌缺失或为空", "NO_AUTH_TOKEN")
+
+            # 确保 Cloudflare cf_clearance 可用
+            await CloudflareClearance.ensure()
 
             cf_clearance = setting.grok_config.get("cf_clearance", "")
             cookie = f"{auth_token};{cf_clearance}" if cf_clearance else auth_token
