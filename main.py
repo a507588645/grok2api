@@ -1,6 +1,7 @@
 """FastAPI应用主入口"""
 
 from contextlib import asynccontextmanager
+import asyncio
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from app.core.logger import logger
@@ -8,6 +9,7 @@ from app.core.exception import register_exception_handlers
 from app.core.storage import storage_manager
 from app.core.config import setting
 from app.services.grok.token import token_manager
+from app.services.grok.cloudflare import CloudflareClearance
 from app.api.v1.chat import router as chat_router
 from app.api.v1.models import router as models_router
 from app.api.v1.images import router as images_router
@@ -44,14 +46,21 @@ async def lifespan(app: FastAPI):
     # 重新加载配置和token数据
     await setting.reload()
     token_manager._load_data()
-    logger.info("[grok2apiChange] 核心服务初始化完成")
+
+    # 异步预热 Cloudflare cf_clearance（不阻塞启动）
+    try:
+        asyncio.create_task(CloudflareClearance.ensure())
+    except Exception:
+        pass
+
+    logger.info("[grok2api] 核心服务初始化完成")
 
     # 2. 管理MCP服务的生命周期
     mcp_lifespan_context = mcp_app.lifespan(app)
     await mcp_lifespan_context.__aenter__()
     logger.info("[MCP] MCP服务初始化完成")
 
-    logger.info("[grok2apiChange] 应用启动成功")
+    logger.info("[grok2api] 应用启动成功")
     
     try:
         yield
@@ -63,16 +72,16 @@ async def lifespan(app: FastAPI):
         
         # 2. 关闭核心服务
         await storage_manager.close()
-        logger.info("[grok2apiChange] 应用关闭成功")
+        logger.info("[grok2api] 应用关闭成功")
 
 
 # 初始化日志
-logger.info("[grok2apiChange] 应用正在启动...")
+logger.info("[grok2api] 应用正在启动...")
 
 # 创建FastAPI应用
 app = FastAPI(
-    title="grok2apiChange",
-    description="grok2apiChange API 转换服务",
+    title="grok2api",
+    description="grok2api API 转换服务",
     version="1.3.1",
     lifespan=lifespan
 )
@@ -101,7 +110,7 @@ async def health_check():
     """健康检查接口"""
     return {
         "status": "healthy",
-        "service": "grok2apiChange",
+        "service": "grok2api",
         "version": "1.0.3"
     }
 
