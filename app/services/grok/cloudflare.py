@@ -57,8 +57,8 @@ ACQUISITION_METHODS = [
             "https://assets.grok.com/favicon.ico",
             "https://grok.com/rest/health"
         ],
-        "browser": "chrome133a",
-        "description": "轮询多个端点获取cf_clearance"
+        "browser": "chrome130",
+        "description": "使用Chrome 130轮询多个端点获取cf_clearance"
     },
 ]
 
