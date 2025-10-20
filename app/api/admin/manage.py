@@ -443,6 +443,8 @@ async def refresh_cf_clearance(_: bool = Depends(verify_admin_session)) -> Dict[
       - success: 是否成功
       - cf_clearance: 若成功，返回带前缀的 cookie 片段（cf_clearance=...）
       - message: 失败说明
+      - details: 失败详情（可选）
+      - at: 失败时间（可选）
     """
     try:
         from app.services.grok.cloudflare import CloudflareClearance
@@ -450,7 +452,15 @@ async def refresh_cf_clearance(_: bool = Depends(verify_admin_session)) -> Dict[
         if value:
             # refresh() 已持久化配置，这里仅回传新值（带前缀，便于直接渲染到输入框）
             return {"success": True, "cf_clearance": f"cf_clearance={value}"}
-        return {"success": False, "message": "自动获取失败，请正确配置服务代理或稍后再试"}
+        # 从配置中获取最近一次失败详情
+        last_error = setting.grok_config.get("cf_last_error", "")
+        last_error_at = setting.grok_config.get("cf_last_error_at", "")
+        return {
+            "success": False,
+            "message": "自动获取失败，请正确配置服务代理或稍后再试",
+            "details": last_error,
+            "at": last_error_at,
+        }
     except Exception as e:
         logger.error(f"[Admin] 刷新 cf_clearance 失败: {e}")
         raise HTTPException(status_code=500, detail={"error": f"刷新失败: {e}", "code": "CF_REFRESH_ERROR"})
