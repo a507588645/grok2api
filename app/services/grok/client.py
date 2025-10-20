@@ -13,6 +13,7 @@ from app.services.grok.processer import GrokResponseProcessor
 from app.services.grok.statsig import get_dynamic_headers
 from app.services.grok.token import token_manager
 from app.services.grok.upload import ImageUploadManager
+from app.services.grok.cloudflare import CloudflareClearance
 from app.core.exception import GrokApiException
 
 # 常量定义
@@ -59,6 +60,9 @@ class GrokClient:
             try:
                 # 获取token
                 auth_token = token_manager.get_token(model)
+
+                # 确保 Cloudflare cf_clearance 可用
+                await CloudflareClearance.ensure()
                 
                 # 上传图片
                 imgs = await GrokClient._upload_imgs(image_urls, auth_token)
@@ -69,20 +73,36 @@ class GrokClient:
                 
             except GrokApiException as e:
                 last_err = e
-                # 401/429 可重试，其他错误直接抛出
+                # 允许处理 HTTP 错误，其他错误直接抛出
                 if e.error_code not in ["HTTP_ERROR", "NO_AVAILABLE_TOKEN"]:
                     raise
-                
+
                 # 检查是否为可重试的状态码
                 status = e.context.get("status") if e.context else None
-                if status not in [401, 429]:
-                    raise
-                
-                if i < MAX_RETRY - 1:
-                    logger.warning(f"[Client] 请求失败(状态码:{status}), 重试 {i+1}/{MAX_RETRY}")
-                    await asyncio.sleep(0.5)  # 短暂延迟
-                else:
-                    logger.error(f"[Client] 重试{MAX_RETRY}次后仍失败")
+
+                # 针对 Cloudflare 403，尝试自动获取 cf_clearance 后重试
+                if status == 403:
+                    logger.warning("[Client] 收到 403，尝试自动获取 cf_clearance 后重试")
+                    await CloudflareClearance.refresh()
+                    if i < MAX_RETRY - 1:
+                        await asyncio.sleep(0.5)
+                        continue
+                    else:
+                        logger.error(f"[Client] 重试{MAX_RETRY}次后仍失败 (403)")
+                        break
+
+                # 401/429 可重试
+                if status in [401, 429]:
+                    if i < MAX_RETRY - 1:
+                        logger.warning(f"[Client] 请求失败(状态码:{status}), 重试 {i+1}/{MAX_RETRY}")
+                        await asyncio.sleep(0.5)  # 短暂延迟
+                        continue
+                    else:
+                        logger.error(f"[Client] 重试{MAX_RETRY}次后仍失败")
+                        break
+
+                # 其他状态码不重试
+                raise
         
         raise last_err if last_err else GrokApiException("请求失败", "REQUEST_ERROR")
 

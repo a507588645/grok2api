@@ -9,6 +9,7 @@ from curl_cffi.requests import AsyncSession
 from app.core.config import setting
 from app.core.logger import logger
 from app.services.grok.statsig import get_dynamic_headers
+from app.services.grok.cloudflare import CloudflareClearance
 
 
 class CacheService:
@@ -33,6 +34,9 @@ class CacheService:
             return cache_path
 
         try:
+            # 确保 Cloudflare cf_clearance 可用
+            await CloudflareClearance.ensure()
+
             cf_clearance = setting.grok_config.get("cf_clearance", "")
             headers = {
                 **get_dynamic_headers(pathname=file_path),
