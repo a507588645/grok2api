@@ -42,7 +42,8 @@ COPY data/setting.toml ./data/
 
 # 删除 Python 字节码和缓存
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    STORAGE_MODE=file
 
 EXPOSE 8000
 
