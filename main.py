@@ -44,14 +44,14 @@ async def lifespan(app: FastAPI):
     # 重新加载配置和token数据
     await setting.reload()
     token_manager._load_data()
-    logger.info("[Grok2API] 核心服务初始化完成")
+    logger.info("[grok2apiChange] 核心服务初始化完成")
 
     # 2. 管理MCP服务的生命周期
     mcp_lifespan_context = mcp_app.lifespan(app)
     await mcp_lifespan_context.__aenter__()
     logger.info("[MCP] MCP服务初始化完成")
 
-    logger.info("[Grok2API] 应用启动成功")
+    logger.info("[grok2apiChange] 应用启动成功")
     
     try:
         yield
@@ -63,16 +63,16 @@ async def lifespan(app: FastAPI):
         
         # 2. 关闭核心服务
         await storage_manager.close()
-        logger.info("[Grok2API] 应用关闭成功")
+        logger.info("[grok2apiChange] 应用关闭成功")
 
 
 # 初始化日志
-logger.info("[Grok2API] 应用正在启动...")
+logger.info("[grok2apiChange] 应用正在启动...")
 
 # 创建FastAPI应用
 app = FastAPI(
-    title="Grok2API",
-    description="Grok API 转换服务",
+    title="grok2apiChange",
+    description="grok2apiChange API 转换服务",
     version="1.3.1",
     lifespan=lifespan
 )
@@ -101,7 +101,7 @@ async def health_check():
     """健康检查接口"""
     return {
         "status": "healthy",
-        "service": "Grok2API",
+        "service": "grok2apiChange",
         "version": "1.0.3"
     }
 

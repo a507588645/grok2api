@@ -1,6 +1,6 @@
-# Grok2API
+# grok2apiChange
 
-基于 **FastAPI** 重构的 Grok2API，全面适配最新 Web 调用格式，支持流式对话、图像生成、图像编辑、联网搜索、深度思考，号池并发与自动负载均衡一体化。
+基于 **FastAPI** 重构的 grok2apiChange，全面适配最新 Web 调用格式，支持流式对话、图像生成、图像编辑、联网搜索、深度思考，号池并发与自动负载均衡一体化。
 
 
 <br>
@@ -62,7 +62,7 @@ curl https://你的服务器地址/v1/chat/completions \
 
 ### 发布 Docker 镜像
 
-默认仓库已内置 GitHub Actions 工作流（`.github/workflows/docker.yml`），当代码推送到 `main` 分支或打上 `v*` 标签时，会自动构建多架构 Docker 镜像并推送到 GitHub Container Registry（`ghcr.io/<你的用户名>/grok2api`）。如需使用该流程：
+默认仓库已内置 GitHub Actions 工作流（`.github/workflows/docker.yml`），当代码推送到 `main` 分支或打上 `v*` 标签时，会自动构建多架构 Docker 镜像并推送到 GitHub Container Registry（`ghcr.io/<你的用户名>/grok2apichange`）。如需使用该流程：
 
 1. 在 GitHub 仓库的 **Settings → Actions → General** 中，确保允许 GitHub Actions 访问 `GITHUB_TOKEN` 的写入权限（默认开启）。
 2. 若要推送到 `ghcr.io`，无需额外配置即可使用仓库内置的 `GITHUB_TOKEN`。
@@ -77,20 +77,20 @@ echo "<个人访问令牌>" | docker login ghcr.io -u <GitHub 用户名> --passw
 # 构建多架构镜像
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  --tag ghcr.io/<你的用户名>/grok2api:latest \
+  --tag ghcr.io/<你的用户名>/grok2apichange:latest \
   --push .
 
 # 或仅构建并在本地测试
-docker build -t grok2api:local .
+docker build -t grok2apichange:local .
 ```
 
 推送成功后，可在云服务器上直接拉取镜像部署：
 
 ```bash
-docker pull ghcr.io/<你的用户名>/grok2api:latest
-docker run -d -p 8000:8000 --name grok2api \
+docker pull ghcr.io/<你的用户名>/grok2apichange:latest
+docker run -d -p 8000:8000 --name grok2apichange \
   -v $(pwd)/data:/app/data \
-  ghcr.io/<你的用户名>/grok2api:latest
+  ghcr.io/<你的用户名>/grok2apichange:latest
 ```
 
 如需公开镜像，可在 GitHub 仓库的 **Packages** 页面将该镜像的可见范围设置为 Public。
@@ -99,8 +99,8 @@ docker run -d -p 8000:8000 --name grok2api \
 
 ```yaml
 services:
-  grok2api:
-    image: ghcr.io/chenyme/grok2api:latest
+  grok2apichange:
+    image: ghcr.io/<你的用户名>/grok2apichange:latest
     ports:
       - "8000:8000"
     volumes:
@@ -110,7 +110,7 @@ services:
       # =====存储模式: file, mysql 或 redis=====
       - STORAGE_MODE=file
       # =====数据库连接 URL (仅在STORAGE_MODE=mysql或redis时需要)=====
-      # - DATABASE_URL=mysql://user:password@host:3306/grok2api
+      # - DATABASE_URL=mysql://user:password@host:3306/grok2apichange
 
       ## MySQL格式: mysql://user:password@host:port/database
       ## Redis格式: redis://host:port/db 或 redis://user:password@host:port/db

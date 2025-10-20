@@ -188,7 +188,7 @@ class MysqlStorage(BaseStorage):
             'password': unquote(parsed.password) if parsed.password else "",
             'host': parsed.hostname,
             'port': parsed.port or 3306,
-            'db': parsed.path[1:] if parsed.path else "grok2api"
+            'db': parsed.path[1:] if parsed.path else "grok2apiChange"
         }
 
     async def _create_db(self, parsed: Dict[str, Any]) -> None:

@@ -18,7 +18,7 @@ def create_mcp_server() -> FastMCP:
         auth = StaticTokenVerifier(
             tokens={
                 api_key: {
-                    "client_id": "grok2api-client",
+                    "client_id": "grok2apiChange-client",
                     "scopes": ["read", "write", "admin"]
                 }
             },
@@ -27,7 +27,7 @@ def create_mcp_server() -> FastMCP:
     
     # 创建FastMCP实例
     return FastMCP(
-        name="Grok2API-MCP",
+        name="grok2apiChange-MCP",
         instructions="MCP server providing Grok AI chat capabilities. Use ask_grok tool to interact with Grok AI models.",
         auth=auth
     )
