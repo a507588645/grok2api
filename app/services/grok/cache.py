@@ -18,7 +18,9 @@ class CacheService:
     def __init__(self, cache_type: str):
         """初始化缓存服务"""
         self.cache_type = cache_type
-        self.cache_dir = Path(f"data/temp/{cache_type}")
+        # 使用绝对路径，确保在任何工作目录下都能正确找到缓存目录
+        # parents[3] 路径结构: cache.py -> grok/ -> services/ -> app/ -> project_root/
+        self.cache_dir = Path(__file__).parents[3] / "data" / "temp" / cache_type
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
     def _cache_path(self, file_path: str) -> Path:
