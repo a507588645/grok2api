@@ -60,6 +60,41 @@ curl https://你的服务器地址/v1/chat/completions \
 
 ## 如何部署
 
+### 发布 Docker 镜像
+
+默认仓库已内置 GitHub Actions 工作流（`.github/workflows/docker.yml`），当代码推送到 `main` 分支或打上 `v*` 标签时，会自动构建多架构 Docker 镜像并推送到 GitHub Container Registry（`ghcr.io/<你的用户名>/grok2api`）。如需使用该流程：
+
+1. 在 GitHub 仓库的 **Settings → Actions → General** 中，确保允许 GitHub Actions 访问 `GITHUB_TOKEN` 的写入权限（默认开启）。
+2. 若要推送到 `ghcr.io`，无需额外配置即可使用仓库内置的 `GITHUB_TOKEN`。
+3. 若希望推送到 Docker Hub 或其他注册表，可在仓库 **Settings → Secrets and variables → Actions** 中新增凭证（例如 `DOCKERHUB_USERNAME`、`DOCKERHUB_TOKEN`），并按照注释修改工作流文件中的 `registry`、`username`、`password` 参数。
+
+也可以在本地手动构建并推送镜像：
+
+```bash
+# 登录容器注册表，以下示例为 ghcr
+echo "<个人访问令牌>" | docker login ghcr.io -u <GitHub 用户名> --password-stdin
+
+# 构建多架构镜像
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  --tag ghcr.io/<你的用户名>/grok2api:latest \
+  --push .
+
+# 或仅构建并在本地测试
+docker build -t grok2api:local .
+```
+
+推送成功后，可在云服务器上直接拉取镜像部署：
+
+```bash
+docker pull ghcr.io/<你的用户名>/grok2api:latest
+docker run -d -p 8000:8000 --name grok2api \
+  -v $(pwd)/data:/app/data \
+  ghcr.io/<你的用户名>/grok2api:latest
+```
+
+如需公开镜像，可在 GitHub 仓库的 **Packages** 页面将该镜像的可见范围设置为 Public。
+
 ### docker-compose
 
 ```yaml
