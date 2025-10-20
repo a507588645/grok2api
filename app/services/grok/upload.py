@@ -70,7 +70,8 @@ class ImageUploadManager:
             if proxy_url:
                 logger.debug(f"[Upload] 使用代理: {proxy_url.split('@')[-1] if '@' in proxy_url else proxy_url}")
 
-            proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
+            # 若未配置代理，明确禁用环境代理
+            proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else {}
 
             # 发送异步请求
             async with AsyncSession() as session:
