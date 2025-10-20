@@ -18,26 +18,47 @@ ACQUISITION_METHODS = [
         "name": "主页访问法",
         "urls": ["https://grok.com/"],
         "browser": "chrome133a",
+        "description": "访问Grok主页获取cf_clearance"
     },
     {
         "name": "静态资源法",
         "urls": ["https://assets.grok.com/favicon.ico"],
         "browser": "chrome133a",
+        "description": "通过静态资源域名获取cf_clearance"
     },
     {
         "name": "API端点法",
         "urls": ["https://grok.com/rest/health"],
         "browser": "chrome133a",
+        "description": "通过API健康检查端点获取cf_clearance"
     },
     {
         "name": "组合访问法",
         "urls": ["https://grok.com/", "https://assets.grok.com/favicon.ico"],
         "browser": "chrome133a",
+        "description": "顺序访问主页和静态资源获取cf_clearance"
     },
     {
         "name": "Safari模拟法",
         "urls": ["https://grok.com/"],
         "browser": "safari_ios_17.4.1",
+        "description": "模拟Safari浏览器访问获取cf_clearance"
+    },
+    {
+        "name": "Chrome131回退法",
+        "urls": ["https://grok.com/"],
+        "browser": "chrome131",
+        "description": "使用Chrome 131浏览器配置获取cf_clearance"
+    },
+    {
+        "name": "多端点轮询法",
+        "urls": [
+            "https://grok.com/",
+            "https://assets.grok.com/favicon.ico",
+            "https://grok.com/rest/health"
+        ],
+        "browser": "chrome133a",
+        "description": "轮询多个端点获取cf_clearance"
     },
 ]
 
@@ -47,6 +68,18 @@ class CloudflareClearance:
 
     _lock = asyncio.Lock()
     _last_error: Optional[str] = None
+
+    @staticmethod
+    def get_available_methods() -> List[Dict[str, str]]:
+        """获取所有可用的获取方法列表
+        
+        Returns:
+            方法列表，每个方法包含 name 和 description
+        """
+        return [
+            {"name": m["name"], "description": m.get("description", "")}
+            for m in ACQUISITION_METHODS
+        ]
 
     @staticmethod
     def _mask_proxy(proxy_url: str) -> str:
@@ -110,7 +143,10 @@ class CloudflareClearance:
                     
                 except Exception as e:
                     logger.warning(f"[CF] 方法 '{method['name']}' 执行异常: {type(e).__name__}: {e}")
-                    continue
+                
+                # 在方法之间添加短暂延迟，避免过于频繁的请求
+                if i < len(ACQUISITION_METHODS):
+                    await asyncio.sleep(0.5)
             
             # 所有方法都失败
             proxy_hint = CloudflareClearance._mask_proxy(proxy_url) if proxy_url else "未使用代理"
