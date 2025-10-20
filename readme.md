@@ -377,6 +377,92 @@ curl https://your-server.com/v1/chat/completions \
 
 本项目仅供学习与研究，请遵守相关使用条款！
 
+### 安全建议
+
+1. **修改默认密码**：部署后立即在管理后台修改默认用户名和密码
+2. **设置 API 密钥**：在管理后台配置 API 密钥以增强安全性
+3. **使用 HTTPS**：生产环境建议通过反向代理（如 Nginx）配置 HTTPS
+4. **防火墙配置**：仅开放必要端口，限制管理后台访问来源
+
+### 生产环境部署建议
+
+#### 1. 使用反向代理
+
+建议使用 Nginx 或 Caddy 作为反向代理，提供 HTTPS 支持：
+
+```nginx
+# Nginx 配置示例
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com;
+    
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+    
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # WebSocket 支持（如需要）
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+
+#### 2. 数据持久化
+
+确保数据目录持久化，避免容器重启导致数据丢失：
+
+```yaml
+volumes:
+  # 使用命名卷（推荐）
+  - grok_data:/app/data
+  # 或使用主机目录
+  - ./data:/app/data
+```
+
+#### 3. 日志管理
+
+定期清理日志文件，避免磁盘空间不足：
+
+```bash
+# 限制日志目录大小
+docker run ... -v $(pwd)/logs:/app/logs ...
+
+# 或使用 Docker 日志驱动
+docker run ... --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 ...
+```
+
+#### 4. 性能优化
+
+- **并发连接**：根据服务器配置调整 uvicorn workers 数量
+- **缓存清理**：在管理后台定期清理图片/视频缓存
+- **数据库优化**：使用 MySQL/Redis 存储模式以支持分布式部署
+
+### 升级指南
+
+```bash
+# 停止服务
+docker-compose down
+
+# 拉取最新镜像
+docker pull ghcr.io/a507588645/grok2api:latest
+
+# 备份数据（重要！）
+docker cp grok2api:/app/data ./data_backup
+
+# 启动新版本
+docker-compose up -d
+
+# 查看日志确认正常运行
+docker-compose logs -f
+```
+
 <br>
 
 > 本项目基于以下项目学习重构，特别感谢：[LINUX DO](https://linux.do)、[VeroFess/grok2api](https://github.com/VeroFess/grok2api)、[xLmiler/grok2api_python](https://github.com/xLmiler/grok2api_python)
