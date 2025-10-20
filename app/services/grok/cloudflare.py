@@ -2,6 +2,7 @@
 
 import asyncio
 from typing import Optional
+from datetime import datetime
 
 from curl_cffi.requests import AsyncSession
 
@@ -15,6 +16,13 @@ class CloudflareClearance:
     """管理 Cloudflare cf_clearance 的自动获取与刷新"""
 
     _lock = asyncio.Lock()
+    _last_error: Optional[str] = None
+
+    @staticmethod
+    def _mask_proxy(proxy_url: str) -> str:
+        if not proxy_url:
+            return ""
+        return proxy_url.split("@")[-1] if "@" in proxy_url else proxy_url
 
     @staticmethod
     async def ensure() -> Optional[str]:
@@ -44,7 +52,7 @@ class CloudflareClearance:
                 # 若未配置代理，明确禁用环境代理
                 proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else {}
                 if proxy_url:
-                    logger.debug(f"[CF] 使用代理获取 cf_clearance: {proxy_url.split('@')[-1] if '@' in proxy_url else proxy_url}")
+                    logger.debug(f"[CF] 使用代理获取 cf_clearance: {CloudflareClearance._mask_proxy(proxy_url)}")
                 else:
                     logger.debug("[CF] 未配置代理，获取 cf_clearance 时禁用环境代理变量")
 
@@ -61,6 +69,9 @@ class CloudflareClearance:
                     "Sec-Fetch-User": "?1",
                 }
 
+                first_status = None
+                second_status = None
+
                 async with AsyncSession() as session:
                     # 访问主页尝试通过 Cloudflare 验证
                     resp = await session.get(
@@ -71,6 +82,7 @@ class CloudflareClearance:
                         allow_redirects=True,
                         timeout=30,
                     )
+                    first_status = getattr(resp, "status_code", None)
                     logger.debug(f"[CF] 访问 grok.com 返回状态: {resp.status_code}")
 
                     # 若未拿到，尝试访问静态资源域名
@@ -84,18 +96,50 @@ class CloudflareClearance:
                             allow_redirects=True,
                             timeout=30,
                         )
+                        second_status = getattr(resp2, "status_code", None)
                         logger.debug(f"[CF] 访问 assets.grok.com 返回状态: {resp2.status_code}")
                         cf_value = CloudflareClearance._extract_cf_clearance(session)
 
                 if cf_value:
                     # 保存到配置（ConfigManager.save 会自动去掉前缀存储、reload 后添加前缀）
-                    await setting.save(grok_config={"cf_clearance": f"cf_clearance={cf_value}"})
+                    await setting.save(
+                        grok_config={
+                            "cf_clearance": f"cf_clearance={cf_value}",
+                            "cf_last_error": "",
+                            "cf_last_success_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        }
+                    )
+                    CloudflareClearance._last_error = None
                     logger.info("[CF] 已自动获取并保存 cf_clearance")
                     return cf_value
                 else:
-                    logger.warning("[CF] 自动获取 cf_clearance 失败，建议在后台手动配置或更换代理/IP")
+                    # 记录失败信息并持久化
+                    proxy_hint = CloudflareClearance._mask_proxy(proxy_url) if proxy_url else "未使用代理"
+                    message = (
+                        f"自动获取 cf_clearance 失败。访问 grok.com 状态: {first_status}; "
+                        f"assets.grok.com 状态: {second_status}; 代理: {proxy_hint}。"
+                        "建议在后台手动配置或更换代理/IP"
+                    )
+                    CloudflareClearance._last_error = message
+                    try:
+                        await setting.save(grok_config={
+                            "cf_last_error": message,
+                            "cf_last_error_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        })
+                    except Exception as se:
+                        logger.warning(f"[CF] 记录失败信息到配置时出错: {se}")
+                    logger.warning("[CF] " + message)
                     return None
             except Exception as e:
+                # 记录异常详情
+                CloudflareClearance._last_error = f"获取 cf_clearance 异常: {type(e).__name__}: {e}"
+                try:
+                    await setting.save(grok_config={
+                        "cf_last_error": CloudflareClearance._last_error,
+                        "cf_last_error_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    })
+                except Exception as se:
+                    logger.warning(f"[CF] 记录失败信息到配置时出错: {se}")
                 logger.error(f"[CF] 获取 cf_clearance 过程中发生异常: {e}")
                 return None
 
