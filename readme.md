@@ -98,6 +98,65 @@ volumes:
 
 <br>
 
+### 从源码构建并“上传”Docker 镜像
+
+以下两种方式二选一：
+
+1) 使用仓库自带脚本（推荐）
+- 登录你的镜像仓库（以 Docker Hub 为例）
+  docker login
+- 构建并推送（默认 linux/amd64，可通过 PLATFORMS 指定多架构）
+  IMAGE=你的用户名/grok2api:latest ./scripts/docker-publish.sh
+  # 多架构推送：
+  IMAGE=你的用户名/grok2api:latest PLATFORMS=linux/amd64,linux/arm64 ./scripts/docker-publish.sh
+
+2) 使用原生命令
+- 构建
+  docker build -t 你的用户名/grok2api:latest .
+- 推送
+  docker push 你的用户名/grok2api:latest
+
+推送到 GitHub Container Registry (GHCR)：
+- 使用具有 package:write 权限的 PAT 登录
+  docker login ghcr.io -u <GitHub用户名> -p <PAT>
+- 标记并推送
+  docker tag 你的用户名/grok2api:latest ghcr.io/<组织或用户名>/grok2api:latest
+  docker push ghcr.io/<组织或用户名>/grok2api:latest
+
+### 使用你自己的镜像启动
+
+- docker-compose（将镜像名替换为你推送的）：
+```yaml
+services:
+  grok2api:
+    image: 你的用户名/grok2api:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - grok_data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - STORAGE_MODE=file
+volumes:
+  grok_data:
+```
+
+- 直接 docker run：
+```bash
+docker run -d --name grok2api \
+  -p 8000:8000 \
+  -v grok_data:/app/data \
+  -v $(pwd)/logs:/app/logs \
+  -e STORAGE_MODE=file \
+  你的用户名/grok2api:latest
+```
+
+数据持久化说明：
+- /app/data 保存配置、令牌与图片/视频缓存，生产环境必须挂卷
+- /app/logs 保存运行日志，建议映射到宿主机以便查看
+
+<br>
+
 ## 接口说明
 
 > 与 OpenAI 官方接口完全兼容，API 请求需通过 **Authorization header** 认证
