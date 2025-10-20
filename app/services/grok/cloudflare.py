@@ -41,9 +41,12 @@ class CloudflareClearance:
         async with CloudflareClearance._lock:
             try:
                 proxy_url = setting.get_service_proxy()
-                proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
+                # 若未配置代理，明确禁用环境代理
+                proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else {}
                 if proxy_url:
                     logger.debug(f"[CF] 使用代理获取 cf_clearance: {proxy_url.split('@')[-1] if '@' in proxy_url else proxy_url}")
+                else:
+                    logger.debug("[CF] 未配置代理，获取 cf_clearance 时禁用环境代理变量")
 
                 headers = {
                     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",

@@ -194,12 +194,14 @@ class GrokClient:
             # 构建请求头
             headers = GrokClient._build_headers(auth_token)
             
-            # 使用服务代理
+            # 使用服务代理；若未配置代理，明确传入空字典以禁用环境代理
             proxy_url = setting.get_service_proxy()
-            proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
+            proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else {}
             
             if proxy_url:
                 logger.debug(f"[Client] 使用服务代理: {proxy_url.split('@')[-1] if '@' in proxy_url else proxy_url}")
+            else:
+                logger.debug("[Client] 未配置服务代理，已禁用环境代理变量")
 
             # 构建请求参数
             request_kwargs = {
