@@ -435,6 +435,27 @@ async def get_settings(_: bool = Depends(verify_admin_session)) -> Dict[str, Any
         raise HTTPException(status_code=500, detail={"error": f"获取配置失败: {str(e)}", "code": "GET_SETTINGS_ERROR"})
 
 
+@router.post("/api/cf/refresh")
+async def refresh_cf_clearance(_: bool = Depends(verify_admin_session)) -> Dict[str, Any]:
+    """自动获取/刷新 Cloudflare cf_clearance
+    
+    返回：
+      - success: 是否成功
+      - cf_clearance: 若成功，返回带前缀的 cookie 片段（cf_clearance=...）
+      - message: 失败说明
+    """
+    try:
+        from app.services.grok.cloudflare import CloudflareClearance
+        value = await CloudflareClearance.refresh()
+        if value:
+            # refresh() 已持久化配置，这里仅回传新值（带前缀，便于直接渲染到输入框）
+            return {"success": True, "cf_clearance": f"cf_clearance={value}"}
+        return {"success": False, "message": "自动获取失败，请正确配置服务代理或稍后再试"}
+    except Exception as e:
+        logger.error(f"[Admin] 刷新 cf_clearance 失败: {e}")
+        raise HTTPException(status_code=500, detail={"error": f"刷新失败: {e}", "code": "CF_REFRESH_ERROR"})
+
+
 class UpdateSettingsRequest(BaseModel):
     """更新配置请求"""
     global_config: Optional[Dict[str, Any]] = None
