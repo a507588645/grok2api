@@ -28,10 +28,6 @@ class ConfigManager:
                     "stream_chunk_timeout": 120,
                     "stream_total_timeout": 600,
                     "stream_first_response_timeout": 30,
-                    "proxy_pool_enabled": False,
-                    "proxy_pool_protocol": "all",
-                    "proxy_pool_count": 5,
-                    "proxy_pool_auto_validate": True,
                 },
                 "global": {
                     "base_url": "",

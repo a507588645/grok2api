@@ -259,9 +259,10 @@ class GrokClient:
         try:
             error_data = response.json()
             error_message = str(error_data)
-        except Exception as e:
+        except Exception:
+            # 如果响应不是JSON格式（如HTML或空响应），使用响应文本
             error_data = response.text
-            error_message = error_data[:200] if error_data else e
+            error_message = error_data[:200] if error_data else f"HTTP {response.status_code}"
 
         # 记录Token失败
         asyncio.create_task(token_manager.record_failure(auth_token, response.status_code, error_message))
