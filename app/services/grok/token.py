@@ -13,7 +13,6 @@ from app.core.exception import GrokApiException
 from app.core.logger import logger
 from app.core.config import setting
 from app.services.grok.statsig import get_dynamic_headers
-from app.services.grok.cloudflare import CloudflareClearance
 
 # 常量定义
 RATE_LIMIT_ENDPOINT = "https://grok.com/rest/rate-limits"
@@ -250,9 +249,6 @@ class GrokTokenManager:
 
             # 准备请求
             payload = {"requestKind": "DEFAULT", "modelName": rate_limit_model_name}
-
-            # 确保 Cloudflare cf_clearance 可用
-            await CloudflareClearance.ensure()
 
             cf_clearance = setting.grok_config.get("cf_clearance", "")
             cookie = f"{auth_token};{cf_clearance}" if cf_clearance else auth_token
