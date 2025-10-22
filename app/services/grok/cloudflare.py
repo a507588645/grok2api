@@ -10,7 +10,7 @@ from app.core.logger import logger
 from app.core.config import setting
 
 # 支持的浏览器配置列表
-BROWSER_PROFILES = ["chrome133a", "chrome131", "chrome130", "safari_ios_17.4.1"]
+BROWSER_PROFILES = ["chrome133a", "chrome131", "chrome124", "safari17_2_ios"]
 
 # 多种获取方法的端点配置
 ACQUISITION_METHODS = [
@@ -41,7 +41,7 @@ ACQUISITION_METHODS = [
     {
         "name": "Safari模拟法",
         "urls": ["https://grok.com/"],
-        "browser": "safari_ios_17.4.1",
+        "browser": "safari17_2_ios",
         "description": "模拟Safari浏览器访问获取cf_clearance"
     },
     {
@@ -57,8 +57,8 @@ ACQUISITION_METHODS = [
             "https://assets.grok.com/favicon.ico",
             "https://grok.com/rest/health"
         ],
-        "browser": "chrome130",
-        "description": "使用Chrome 130轮询多个端点获取cf_clearance"
+        "browser": "chrome124",
+        "description": "使用Chrome 124轮询多个端点获取cf_clearance"
     },
 ]
 
