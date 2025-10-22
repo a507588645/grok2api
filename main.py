@@ -9,7 +9,6 @@ from app.core.exception import register_exception_handlers
 from app.core.storage import storage_manager
 from app.core.config import setting
 from app.services.grok.token import token_manager
-from app.services.grok.cloudflare import CloudflareClearance
 from app.api.v1.chat import router as chat_router
 from app.api.v1.models import router as models_router
 from app.api.v1.images import router as images_router
@@ -46,12 +45,6 @@ async def lifespan(app: FastAPI):
     # 重新加载配置和token数据
     await setting.reload()
     token_manager._load_data()
-
-    # 异步预热 Cloudflare cf_clearance（不阻塞启动）
-    try:
-        asyncio.create_task(CloudflareClearance.ensure())
-    except Exception:
-        pass
 
     logger.info("[grok2api] 核心服务初始化完成")
 

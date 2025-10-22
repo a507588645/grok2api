@@ -9,7 +9,6 @@ from curl_cffi.requests import AsyncSession
 from app.core.config import setting
 from app.core.logger import logger
 from app.services.grok.statsig import get_dynamic_headers
-from app.services.grok.cloudflare import CloudflareClearance
 
 
 class CacheService:
@@ -36,9 +35,6 @@ class CacheService:
             return cache_path
 
         try:
-            # 确保 Cloudflare cf_clearance 可用
-            await CloudflareClearance.ensure()
-
             cf_clearance = setting.grok_config.get("cf_clearance", "")
             headers = {
                 **get_dynamic_headers(pathname=file_path),
@@ -73,15 +69,6 @@ class CacheService:
                     )
 
                 response = await do_get(headers)
-
-                # 如遇403，尝试刷新cf_clearance后重试一次
-                if response.status_code == 403:
-                    logger.warning(f"[{self.cache_type.upper()}Cache] 收到403，尝试刷新 cf_clearance 后重试一次")
-                    await CloudflareClearance.refresh()
-                    cf_clearance_new = setting.grok_config.get("cf_clearance", "")
-                    new_headers = headers.copy()
-                    new_headers["Cookie"] = f"{auth_token};{cf_clearance_new}" if cf_clearance_new else auth_token
-                    response = await do_get(new_headers)
 
                 if response.status_code != 200:
                     logger.error(f"[{self.cache_type.upper()}Cache] 下载失败，状态码: {response.status_code}")

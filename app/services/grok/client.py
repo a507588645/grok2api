@@ -13,7 +13,6 @@ from app.services.grok.processer import GrokResponseProcessor
 from app.services.grok.statsig import get_dynamic_headers
 from app.services.grok.token import token_manager
 from app.services.grok.upload import ImageUploadManager
-from app.services.grok.cloudflare import CloudflareClearance
 from app.core.exception import GrokApiException
 
 # 常量定义
@@ -60,9 +59,6 @@ class GrokClient:
             try:
                 # 获取token
                 auth_token = token_manager.get_token(model)
-
-                # 确保 Cloudflare cf_clearance 可用
-                await CloudflareClearance.ensure()
                 
                 # 上传图片
                 imgs = await GrokClient._upload_imgs(image_urls, auth_token)
@@ -80,10 +76,9 @@ class GrokClient:
                 # 检查是否为可重试的状态码
                 status = e.context.get("status") if e.context else None
 
-                # 针对 Cloudflare 403，尝试自动获取 cf_clearance 后重试
+                # 针对 403 错误
                 if status == 403:
-                    logger.warning("[Client] 收到 403，尝试自动获取 cf_clearance 后重试")
-                    await CloudflareClearance.refresh()
+                    logger.warning("[Client] 收到 403 错误")
                     if i < MAX_RETRY - 1:
                         await asyncio.sleep(0.5)
                         continue

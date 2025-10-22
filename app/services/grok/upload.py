@@ -11,7 +11,6 @@ from app.services.grok.statsig import get_dynamic_headers
 from app.core.exception import GrokApiException
 from app.core.config import setting
 from app.core.logger import logger
-from app.services.grok.cloudflare import CloudflareClearance
 
 # 常量定义
 UPLOAD_ENDPOINT = "https://grok.com/rest/app-chat/upload-file"
@@ -60,9 +59,6 @@ class ImageUploadManager:
             if not auth_token:
                 raise GrokApiException("认证令牌缺失或为空", "NO_AUTH_TOKEN")
 
-            # 确保 Cloudflare cf_clearance 可用
-            await CloudflareClearance.ensure()
-
             cf_clearance = setting.grok_config.get("cf_clearance", "")
             cookie = f"{auth_token};{cf_clearance}" if cf_clearance else auth_token
             
@@ -73,7 +69,7 @@ class ImageUploadManager:
             # 若未配置代理，明确禁用环境代理
             proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else {}
 
-            # 发送异步请求（支持403时自动刷新cf_clearance并重试一次）
+            # 发送异步请求
             async with AsyncSession() as session:
                 async def do_post(cookies: str):
                     return await session.post(
@@ -89,14 +85,6 @@ class ImageUploadManager:
                     )
 
                 response = await do_post(cookie)
-
-                # 如被CF拦截，尝试刷新cf_clearance并重试一次
-                if response.status_code == 403:
-                    logger.warning("[Upload] 收到403，尝试刷新 cf_clearance 后重试一次")
-                    await CloudflareClearance.refresh()
-                    cf_clearance_new = setting.grok_config.get("cf_clearance", "")
-                    retry_cookie = f"{auth_token};{cf_clearance_new}" if cf_clearance_new else auth_token
-                    response = await do_post(retry_cookie)
 
                 if response.status_code == 200:
                     result = response.json()

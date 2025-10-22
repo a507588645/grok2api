@@ -407,21 +407,9 @@ async def delete_tokens(request: DeleteTokensRequest,
 
 @router.get("/api/settings")
 async def get_settings(_: bool = Depends(verify_admin_session)) -> Dict[str, Any]:
-    """获取全局配置
-    
-    优化：在返回配置前尝试自动获取 Cloudflare cf_clearance，
-    以便在管理页面无需手动填写即可展示。
-    """
+    """获取全局配置"""
     try:
         logger.debug("[Admin] 获取全局配置")
-
-        # 在返回设置前确保 cf_clearance 可用（若尚未配置则自动获取）
-        try:
-            from app.services.grok.cloudflare import CloudflareClearance
-            await CloudflareClearance.ensure()
-        except Exception as _:
-            # 忽略自动获取失败，保持原有返回逻辑
-            pass
 
         return {
             "success": True,
@@ -433,37 +421,6 @@ async def get_settings(_: bool = Depends(verify_admin_session)) -> Dict[str, Any
     except Exception as e:
         logger.error(f"[Admin] 获取配置失败: {str(e)}")
         raise HTTPException(status_code=500, detail={"error": f"获取配置失败: {str(e)}", "code": "GET_SETTINGS_ERROR"})
-
-
-@router.post("/api/cf/refresh")
-async def refresh_cf_clearance(_: bool = Depends(verify_admin_session)) -> Dict[str, Any]:
-    """自动获取/刷新 Cloudflare cf_clearance
-    
-    返回：
-      - success: 是否成功
-      - cf_clearance: 若成功，返回带前缀的 cookie 片段（cf_clearance=...）
-      - message: 失败说明
-      - details: 失败详情（可选）
-      - at: 失败时间（可选）
-    """
-    try:
-        from app.services.grok.cloudflare import CloudflareClearance
-        value = await CloudflareClearance.refresh()
-        if value:
-            # refresh() 已持久化配置，这里仅回传新值（带前缀，便于直接渲染到输入框）
-            return {"success": True, "cf_clearance": f"cf_clearance={value}"}
-        # 从配置中获取最近一次失败详情
-        last_error = setting.grok_config.get("cf_last_error", "")
-        last_error_at = setting.grok_config.get("cf_last_error_at", "")
-        return {
-            "success": False,
-            "message": "自动获取失败，请正确配置服务代理或稍后再试",
-            "details": last_error,
-            "at": last_error_at,
-        }
-    except Exception as e:
-        logger.error(f"[Admin] 刷新 cf_clearance 失败: {e}")
-        raise HTTPException(status_code=500, detail={"error": f"刷新失败: {e}", "code": "CF_REFRESH_ERROR"})
 
 
 class UpdateSettingsRequest(BaseModel):
