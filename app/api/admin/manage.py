@@ -772,7 +772,7 @@ class FetchProxiesRequest(BaseModel):
     """获取代理请求"""
     protocol: str = "all"  # http, https, socks4, socks5, all
     count: int = 5
-    validate: bool = True
+    validate_proxies: bool = True  # Renamed from 'validate' to avoid shadowing BaseModel.validate
 
 
 @router.post("/api/proxy/fetch")
@@ -790,12 +790,12 @@ async def fetch_proxies(request: FetchProxiesRequest,
         代理列表及统计信息
     """
     try:
-        logger.debug(f"[Admin] 获取代理池 - 协议: {request.protocol}, 数量: {request.count}, 验证: {request.validate}")
+        logger.debug(f"[Admin] 获取代理池 - 协议: {request.protocol}, 数量: {request.count}, 验证: {request.validate_proxies}")
         
         proxies = await ProxyPool.fetch_and_validate(
             protocol=request.protocol,
             count=request.count,
-            validate=request.validate
+            validate=request.validate_proxies
         )
         
         if not proxies:
@@ -809,13 +809,13 @@ async def fetch_proxies(request: FetchProxiesRequest,
                 }
             }
         
-        valid_count = sum(1 for p in proxies if p.get("valid") is True) if request.validate else 0
+        valid_count = sum(1 for p in proxies if p.get("valid") is True) if request.validate_proxies else 0
         
         logger.debug(f"[Admin] 代理获取成功 - 总数: {len(proxies)}, 可用: {valid_count}")
         
         return {
             "success": True,
-            "message": f"成功获取 {len(proxies)} 个代理" + (f"，其中 {valid_count} 个可用" if request.validate else ""),
+            "message": f"成功获取 {len(proxies)} 个代理" + (f"，其中 {valid_count} 个可用" if request.validate_proxies else ""),
             "data": {
                 "proxies": proxies,
                 "total": len(proxies),
@@ -846,7 +846,7 @@ async def refresh_proxies(request: FetchProxiesRequest,
         proxies = await ProxyPool.refresh_proxies(
             protocol=request.protocol,
             count=request.count,
-            validate=request.validate
+            validate=request.validate_proxies
         )
         
         if not proxies:
@@ -860,13 +860,13 @@ async def refresh_proxies(request: FetchProxiesRequest,
                 }
             }
         
-        valid_count = sum(1 for p in proxies if p.get("valid") is True) if request.validate else 0
+        valid_count = sum(1 for p in proxies if p.get("valid") is True) if request.validate_proxies else 0
         
         logger.debug(f"[Admin] 代理池刷新成功 - 总数: {len(proxies)}, 可用: {valid_count}")
         
         return {
             "success": True,
-            "message": f"代理池已刷新，共 {len(proxies)} 个代理" + (f"，其中 {valid_count} 个可用" if request.validate else ""),
+            "message": f"代理池已刷新，共 {len(proxies)} 个代理" + (f"，其中 {valid_count} 个可用" if request.validate_proxies else ""),
             "data": {
                 "proxies": proxies,
                 "total": len(proxies),

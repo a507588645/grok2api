@@ -362,7 +362,7 @@ curl https://your-server.com/v1/chat/completions \
 | video_cache_max_size_mb    | global  | 否   | 视频缓存最大容量(MB)                     | 1024   |
 | base_url                   | global  | 否   | 服务基础URL/图片访问基准                 | ""     |
 | api_key                    | grok    | 否   | API 密钥（可选加强安全）                | ""     |
-| proxy_url                  | grok    | 否   | HTTP代理服务器地址                      | ""     |
+| proxy_url                  | grok    | 否   | HTTP代理服务器地址（可手动输入或从代理池选择） | ""     |
 | stream_chunk_timeout       | grok    | 否   | 流式分块超时时间(秒)                     | 120    |
 | stream_first_response_timeout | grok | 否   | 流式首次响应超时时间(秒)                 | 30     |
 | stream_total_timeout       | grok    | 否   | 流式总超时时间(秒)                       | 600    |
@@ -370,6 +370,32 @@ curl https://your-server.com/v1/chat/completions \
 | x_statsig_id               | grok    | 是   | 反机器人唯一标识符                      | "ZTpUeXBlRXJyb3I6IENhbm5vdCByZWFkIHByb3BlcnRpZXMgb2YgdW5kZWZpbmVkIChyZWFkaW5nICdjaGlsZE5vZGVzJyk=" |
 | filtered_tags              | grok    | 否   | 过滤响应标签（逗号分隔）                | "xaiartifact,xai:tool_usage_card,grok:render" |
 | temporary                  | grok    | 否   | 会话模式 true(临时)/false               | true   |
+
+### 代理池功能
+
+系统支持从代理池 API 自动获取高质量代理 IP，并提供验证功能：
+
+**功能特点：**
+- 🔄 **自动获取**：从 [proxy.scdn.io](https://proxy.scdn.io) 代理池 API 自动获取代理
+- ✅ **代理验证**：获取代理后自动验证其可用性
+- 🎯 **协议筛选**：支持按协议类型筛选（HTTP、HTTPS、SOCKS4、SOCKS5 或全部）
+- 📊 **智能选择**：在管理后台下拉列表中选择可用代理，可用代理标记 ✓，不可用标记 ✗
+- 🔁 **一键刷新**：点击"获取代理"按钮即可重新获取最新代理列表
+
+**使用方法：**
+1. 登录管理后台 `/manage`
+2. 进入 Setting 配置 → Grok 配置
+3. 在"代理池"部分选择协议类型和数量
+4. 点击"获取代理"按钮
+5. 从下拉列表中选择可用的代理
+6. 保存配置即可生效
+
+**手动配置：**
+您仍可以手动在 Proxy Url 输入框中输入自定义代理地址，格式如：
+```
+socks5://username:password@127.0.0.1:7890
+```
+
 
 <br>
 
