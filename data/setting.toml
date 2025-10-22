@@ -8,6 +8,8 @@ filtered_tags = "xaiartifact,xai:tool_usage_card,grok:render"
 stream_chunk_timeout = 120
 stream_total_timeout = 600
 stream_first_response_timeout = 30
+cf_last_error = "所有 7 种自动获取方法均失败。代理: 未使用代理。建议在后台手动配置或更换代理/IP"
+cf_last_error_at = "2025-10-22 05:10:55"
 
 [global]
 base_url = ""
